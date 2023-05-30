@@ -20,7 +20,7 @@ Parameters:
 Resources:
 
   Api:
-    Type: AWS::Serverless::Api
+    Type: AWS::Serverless::Api # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-api.html
     Properties:
       StageName: !Sub "${Environment}"
 
@@ -67,3 +67,31 @@ Resources:
       Runtime: python3.9
       Architectures:
         - x86_64
+
+  Register:
+    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    UpdateReplacePolicy: Delete
+    DeletionPolicy: Delete
+    Properties:
+      Name: !Sub "${Name}-register-${Environment}"
+      Type: EXPRESS # https://docs.aws.amazon.com/step-functions/latest/dg/concepts-standard-vs-express.html
+      DefinitionUri: statemachine/register.asl.json
+      DefinitionSubstitutions:
+        CheckImageQualityFunctionArn: !GetAtt CheckImageQualityFunction.Arn
+      Policies: # Find out more about SAM policy templates: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-policy-templates.html
+        - LambdaInvokePolicy:
+            FunctionName: !Ref CheckImageQualityFunction
+      Events:
+        ApiEvent:
+          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+          Properties:
+            Path: /register
+            Method: get
+            RestApiId: !Ref Api
+Outputs:
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
+  Api:
+    Description: "API Gateway endpoint URL for stage"
+    Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/"

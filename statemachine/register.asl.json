@@ -1,0 +1,19 @@
+{
+    "Comment": "A state machine",
+    "StartAt": "CheckImageQuality",
+    "States": {
+        "CheckImageQuality": {
+            "Type":"Task",
+            "Resource": "${CheckImageQualityFunctionArn}",
+            "InputPath":"$.inputRequest",
+            "OutputPath":"$",
+            "ResultPath":"$.detection",
+            "Retry": [
+                {
+                    "ErrorEquals": ["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"]
+                }
+            ],
+            "End": true
+        }
+    }
+}
