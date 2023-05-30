@@ -1,5 +1,6 @@
 {
     "Comment": "A state machine",
+    "TimeoutSeconds": 30,
     "StartAt": "CheckImageQuality",
     "States": {
         "CheckImageQuality": {
@@ -10,10 +11,77 @@
             "ResultPath":"$.detection",
             "Retry": [
                 {
-                    "ErrorEquals": ["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"]
+                    "ErrorEquals": ["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+
                 }
             ],
-            "End": true
+            "Next": "SearchExistingFaces"
+        },
+        "SearchExistingFaces": {
+            "Type":"Task",
+            "Resource": "${SearchExistingFacesFunctionArn}",
+            "InputPath":"$.inputRequest",
+            "OutputPath":"$",
+            "ResultPath":"$.search",
+            "Retry": [
+                {
+                    "ErrorEquals": ["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 6,
+                    "BackoffRate": 2
+
+                }
+            ],
+            "Next": "CheckSearchResults"
+        },
+        "CheckSearchResults": {
+            "Type": "Choice",
+            "Choices": [
+                {
+                    "Variable": "$.search.Payload.TopMatch.Face.ExternalImageId",
+                    "StringEquals": "Special:RIV_NO_FACE_MATCH",
+                    "Next": "IndexFaceInfo"
+                },
+                {
+                    "Variable": "$.search.Payload.TopMatch.Face.IsCallerUser",
+                    "BooleanEquals": true,
+                    "Next": "IndexFaceInfo"
+                }
+            ],
+            "Default": "UserAlreadyExistsError"
+        },
+        "UserAlreadyExistsError": {
+            "Type": "Fail",
+            "End": true,
+            "Error": "UserAlreadyExists",
+            "Cause": "Cannot register double faces in same collections."
+        },
+        "IndexFaceInfo": {
+            "Type":"Task",
+            "Resource": "${IndexFaceInfoFunctionArn}",
+            "Retry":[{
+                "ErrorEquals":["Lambda.ServiceException","Lambda.AWSLambdaException","Lambda.SdkClientException"],
+                "IntervalSeconds":2,
+                "MaxAttempts":6,
+                "BackoffRate":2
+            }],
+            
+            "InputPath":"$.inputRequest",
+            "OutputPath":"$",
+            "ResultPath":"$.index",
+            "Next":"RegistrationComplete"
+        },
+        "RegistrationComplete": {
+            "Type":"Pass",
+            "End":true,
+            "Parameters": {
+                "UserId.$":"$.inputRequest.UserId",
+                "ImageId.$":"$.index.Payload.FaceRecord.Face.ImageId",
+                "Status":"Registered"
+            }
         }
     }
 }

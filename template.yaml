@@ -18,7 +18,6 @@ Parameters:
     Default: "test"
 
 Resources:
-
   Api:
     Type: AWS::Serverless::Api # https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-api.html
     Properties:
@@ -68,6 +67,24 @@ Resources:
       Architectures:
         - x86_64
 
+  SearchExistingFacesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/search-existing-faces
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+
+  IndexFaceInfoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/index-face-ino
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Architectures:
+        - x86_64
+
   Register:
     Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
     UpdateReplacePolicy: Delete
@@ -78,9 +95,15 @@ Resources:
       DefinitionUri: statemachine/register.asl.json
       DefinitionSubstitutions:
         CheckImageQualityFunctionArn: !GetAtt CheckImageQualityFunction.Arn
+        SearchExistingFacesFunctionArn: !GetAtt SearchExistingFacesFunction.Arn
+        IndexFaceInfoFunctionArn: !GetAtt IndexFaceInfoFunction.Arn
       Policies: # Find out more about SAM policy templates: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-policy-templates.html
         - LambdaInvokePolicy:
             FunctionName: !Ref CheckImageQualityFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref SearchExistingFacesFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref IndexFaceInfoFunction
       Events:
         ApiEvent:
           Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
